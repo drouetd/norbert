@@ -17,6 +17,23 @@ def read_csv(filename):
 			lst.append(person)
 	return lst
 
+
+def write_to_csv(filename, fields, records):
+	""" Writes a list of dictionaries to a csv file. """
+	
+	with open(filename, 'wb') as csvfile:
+		writer = csv.DictWriter(csvfile, fieldnames=fields, delimiter=',',quotechar='"',quoting=csv.QUOTE_ALL)
+		# writer.writeheader()
+		for rec in records:
+			try:
+				writer.writerow(rec)
+			except:
+				print "%s occurred with %s" % (sys.exc_info()[0].__name__, rec[fields[0]])
+				print rec
+				print'\n'
+	return 
+
+
 def post_norbert(payload, key):
 	""" Posts to the voilanorbert.com api using the payload as parameters. """
 	
@@ -46,12 +63,16 @@ def post_norbert(payload, key):
 		payload['emails'] = None
 		payload['error'] = sys.exc_info()[0].__name__
 	
+	# remove API key before returning
+	del payload['token']
+	
 	return payload, add_credits
 
 
 
 if __name__ == '__main__':
-	bulk = []
+	original = []
+	augmented = []
 	# parse args and error handling
 	
 	# fetch the api key
@@ -59,18 +80,26 @@ if __name__ == '__main__':
 		key = f.read()
 	
 	# load csv file with names to match
-	bulk = read_csv('Data/test_error.csv')
+	original = read_csv('Data/test.csv')
 	
-	# send names norbert api one at a time
-	for person in bulk:
-		print "Payload sent: ", person
+	# send names to the voilanorbert api one at a time
+	for person in original:
 		result, buy_credits = post_norbert(person, key)
-		print "result:", result
-		print "buy_credits:", buy_credits
+		if buy_credits:
+			# save names processed so far
+			# mark where we are at
+			# inform Dan that we need to buy more credits
+			# exit with nice message
+			pass
+		else:
+			augmented.append(result)
 	
-	# write results back to a csv
+	# write augmented list to a csv
+	output_filename = "Data/test1_out.csv"
+	fields = ['name', 'domain', 'success', 'emails', 'error']
+	write_to_csv(output_filename, fields, augmented)
 	
 	# terminate with stats msg
-	
+	print "\nDone!"
 	
 	sys.exit()
