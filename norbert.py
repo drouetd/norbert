@@ -71,6 +71,7 @@ def post_norbert(payload, key):
 
 
 if __name__ == '__main__':
+	
 	original = []
 	augmented = []
 	# parse args and error handling
@@ -80,7 +81,7 @@ if __name__ == '__main__':
 		key = f.read()
 	
 	# load csv file with names to match
-	original = read_csv('Data/test.csv')
+	original = read_csv('Data/test_error.csv')
 	
 	# send names to the voilanorbert api one at a time
 	for person in original:
@@ -90,16 +91,26 @@ if __name__ == '__main__':
 			# mark where we are at
 			# inform Dan that we need to buy more credits
 			# exit with nice message
-			pass
+			print "Buy more credits!!!"
+			sys.exit()
 		else:
 			augmented.append(result)
 	
 	# write augmented list to a csv
-	output_filename = "Data/test1_out.csv"
+	output_filename = "Data/out.csv"
 	fields = ['name', 'domain', 'success', 'emails', 'error']
 	write_to_csv(output_filename, fields, augmented)
 	
 	# terminate with stats msg
-	print "\nDone!"
+	processed = len(original)
+	matched = len([person for person in original if person['success']==True])
+	print "Names processed: %d" % processed
+	print "Names matched to emails: %d" % matched
+	if processed:
+		percent = (matched / float(processed))*100
+		print "Success rate: %.1f" % percent
+	else:
+		print "Success rate: n/a"
+	print "Done!"
 	
 	sys.exit()
