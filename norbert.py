@@ -3,8 +3,26 @@
 import sys
 import csv
 import requests
+from urlparse import urlparse
 
-def read_csv(filename):
+
+def extract_domain(website):
+	domain = ''
+	# urlparse only recognizes netloc if '//' present.
+	if '//' not in website:
+		website = '//' + website
+	url = urlparse(website)
+	parts = url.netloc.split('.')
+	if len(parts) == 2:
+		domain = url.netloc
+	elif len(parts) > 2:
+		domain = '.'.join(parts[-2:])
+	else:
+		print "Problem parsing %s." % website
+	return domain
+
+
+def read_csv(filename, name, website):
 	""" Converts CSV file to list of dictionaries. """
 	
 	lst = []
@@ -12,8 +30,9 @@ def read_csv(filename):
 		csvfile = csv.reader(f)
 		for row in csvfile:
 			person = {}
-			person['name'] = row[0]
-			person['domain'] = row[1]
+			person['name'] = row[name]
+			person['website'] = row[website]
+			person['domain'] = extract_domain(row[website])
 			lst.append(person)
 	return lst
 
@@ -74,20 +93,37 @@ if __name__ == '__main__':
 	
 	original = []
 	augmented = []
-	# parse args and error handling
 	
+	# parse args and error handling
+	if len(sys.argv) == 1:
+		print "Usage: python norbert.py -i"
+		sys.exit()
+	elif sys.argv[1] == '-i':
+		file_name = raw_input("Path to CSV file to process: ")
+		col_name = raw_input("Column number that contains the person's name: ")
+		col_website = raw_input("Column number that contains the company's website: ")
+		# and because people don<t satrt counting at 0...
+		col_name = int(col_name) - 1 
+		if col_website != ('none' or 'None'):
+			col_website = int(col_website) - 1
+		else:
+			col_website = None
+	else:
+		print "Error processing arguments."
+		sys.exit()
+			
 	# fetch the api key
 	with open('Data/apikey.txt', 'r') as f:
 		key = f.read()
 	
 	# load csv file with names to match
-	original = read_csv('Data/test_error.csv')
+	original = read_csv(file_name, col_name, col_website)
 	
 	# send names to the voilanorbert api one at a time
 	for person in original:
 		result, buy_credits = post_norbert(person, key)
 		if buy_credits:
-			# save names processed so far
+			# TODO:save names processed so far
 			# mark where we are at
 			# inform Dan that we need to buy more credits
 			# exit with nice message
@@ -98,17 +134,17 @@ if __name__ == '__main__':
 	
 	# write augmented list to a csv
 	output_filename = "Data/out.csv"
-	fields = ['name', 'domain', 'success', 'emails', 'error']
+	fields = ['name', 'website', 'domain', 'success', 'emails', 'error']
 	write_to_csv(output_filename, fields, augmented)
 	
 	# terminate with stats msg
 	processed = len(original)
 	matched = len([person for person in original if person['success']==True])
-	print "Names processed: %d" % processed
+	print "\nNames processed: %d" % processed
 	print "Names matched to emails: %d" % matched
 	if processed:
 		percent = (matched / float(processed))*100
-		print "Success rate: %.1f" % percent
+		print "Success rate: %.1f percent" % percent
 	else:
 		print "Success rate: n/a"
 	print "Done!"
