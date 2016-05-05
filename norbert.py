@@ -5,6 +5,26 @@ import csv
 import requests
 from urlparse import urlparse
 
+def parse_args():
+	# parse args and error handling
+	if len(sys.argv) == 1:
+		print "Usage: python norbert.py -i"
+		sys.exit()
+	elif sys.argv[1] == '-i':
+		file_name = raw_input("Path to CSV file to process: ")
+		col_name = raw_input("Column number that contains the person's name: ")
+		col_website = raw_input("Column number that contains the company's website: ")
+		# and because people don't start counting at 0...
+		col_name = int(col_name) - 1 
+		if col_website != ('none' or 'None'):
+			col_website = int(col_website) - 1
+		else:
+			col_website = None
+	else:
+		print "Error processing arguments."
+		sys.exit()
+	return file_name, col_name, col_website
+
 
 def extract_domain(website):
 	domain = ''
@@ -19,6 +39,7 @@ def extract_domain(website):
 		domain = '.'.join(parts[-2:])
 	else:
 		print "Problem parsing %s." % website
+		domain = None
 	return domain
 
 
@@ -35,6 +56,14 @@ def read_csv(filename, name, website):
 			person['domain'] = extract_domain(row[website])
 			lst.append(person)
 	return lst
+
+
+def generate_output_filename(file_name, suffix):
+	""" Adds a suffix to the input csv to track progress through data pipeline. """
+	parts = file_name.split('.')
+	if len(parts) == 2:
+		output_filename = parts[0] + suffix + '.' + parts[1]
+	return output_filename
 
 
 def write_to_csv(filename, fields, records):
@@ -95,22 +124,11 @@ if __name__ == '__main__':
 	augmented = []
 	
 	# parse args and error handling
-	if len(sys.argv) == 1:
-		print "Usage: python norbert.py -i"
-		sys.exit()
-	elif sys.argv[1] == '-i':
-		file_name = raw_input("Path to CSV file to process: ")
-		col_name = raw_input("Column number that contains the person's name: ")
-		col_website = raw_input("Column number that contains the company's website: ")
-		# and because people don<t satrt counting at 0...
-		col_name = int(col_name) - 1 
-		if col_website != ('none' or 'None'):
-			col_website = int(col_website) - 1
-		else:
-			col_website = None
-	else:
-		print "Error processing arguments."
-		sys.exit()
+	file_name, col_name, col_website = parse_args()
+	
+	# format the output file
+	output_filename = generate_output_filename(file_name, "_email")
+	fields = ['name', 'website', 'domain', 'success', 'emails', 'error']
 			
 	# fetch the api key
 	with open('Data/apikey.txt', 'r') as f:
@@ -121,20 +139,18 @@ if __name__ == '__main__':
 	
 	# send names to the voilanorbert api one at a time
 	for person in original:
+		# TODO: if person['domain'] is None: don't send to Norbert.
+		print "Email lookup for %s..." % person['name']
 		result, buy_credits = post_norbert(person, key)
 		if buy_credits:
-			# TODO:save names processed so far
-			# mark where we are at
-			# inform Dan that we need to buy more credits
-			# exit with nice message
+			# save names processed so far and exit with nice message
 			print "Buy more credits!!!"
+			write_to_csv(output_filename, fields, augmented)
 			sys.exit()
 		else:
 			augmented.append(result)
 	
 	# write augmented list to a csv
-	output_filename = "Data/out.csv"
-	fields = ['name', 'website', 'domain', 'success', 'emails', 'error']
 	write_to_csv(output_filename, fields, augmented)
 	
 	# terminate with stats msg
