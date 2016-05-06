@@ -1,72 +1,48 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import csv
-import time
 import urllib
 import requests
 from requests.auth import HTTPBasicAuth
-from googlesearch import GoogleSearch
-from norbert import write_to_csv
-from norbert import generate_output_filename
+from ConfigParser import SafeConfigParser
+from formatting import write_to_csv
+from formatting import generate_output_filename
+from formatting import dict_read_csv
 
 def parse_args():
-	# parse args and error handling
-	if len(sys.argv) == 1:
-		print "Usage: python norbert.py -i"
-		sys.exit()
-	elif sys.argv[1] == '-i':
-		file_name = raw_input("Path to CSV file to process: ")
-		col_name = raw_input("Column number that contains the person's name: ")
-		col_company = raw_input("Column number that contains the company name: ")
-		# and because people don't start counting at 0...
-		col_name = int(col_name) - 1 
-		if col_company != ('none' or 'None'):
-			col_company = int(col_company) - 1
-		else:
-			col_company = None
-	else:
-		print "Error processing arguments."
-		sys.exit()
-	return file_name, col_name, col_company
+	file_name = raw_input("Path to CSV file to process: ")
+	return file_name
 
 
-def read_csv(filename, name, company):
-	""" Converts CSV file to list of dictionaries. """
+def get_websites(records):
+	""" Iterate over list of contacts.Search Bing for company name \
+		and add first result's URL to contact's record. """
 	
-	lst = []
-	with open(filename, 'r') as f:
-		csvfile = csv.reader(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL, skipinitialspace=True)
-		for row in csvfile:
-			person = {}
-			person['name'] = row[name]
-			person['company'] = row[company]
-			lst.append(person)
-	return lst
-
-
-def get_website(company_name):
-	#gs = GoogleSearch(company_name)
-	results = bing_api(company_name, top=1)
-	#for results in results:
-	print "\n%s" % company_name
-	print results['Url']
-	print results['Description']
-	return results['Url']
-
-
-def google_search(query):
-	URL = "https://ajax.googleapis.com/ajax/services/search/web"
-	params = {'v':1.0, 'q': query}
-	r = requests.get(URl, data=params)
+	augmented=[]
+	for record in records:
+		try:
+			# get company URL
+			result = bing_api(record['company'], top=1)
+			record['website'] = result['Url']
+		except:
+			# save work done so far and exit
+			write_to_csv(output_filename, output_fields, results)
+			print "%s occurred processing %s." % (sys.exc_info()[0].__name__, record['contact'])
+			sys.exit()
+		print record['website']
+		augmented.append(record)
+	
+	return augmented
 
 
 def bing_api(query, source_type = "Web", top = 10, format = 'json'):
 	"""Returns the decoded json response content."""
 	# Source --> https://xyang.me/using-bing-search-api-in-python/
 	
-	# Bing API key
-	API_KEY = "tDG6GvbiMPX2kxr9PQHF8OSKtnstlm8StD91YR3lE/8"
+	# get Bing API key
+	parser = SafeConfigParser()
+	parser.read('config.txt')
+	API_KEY = parser.get('bing', 'api_key')
 	
 	# set search url
 	query = '%27' + urllib.quote(query) + '%27'
@@ -94,28 +70,17 @@ def bing_api(query, source_type = "Web", top = 10, format = 'json'):
 
 if __name__ == "__main__":
 	
-	# parse input and format output
-	filename, person_name, company_name = parse_args()
+	# parse input
+	filename = parse_args()
 	output_filename = generate_output_filename(filename, "_web")
-	output_fields = ['name', 'company', 'website']
 	
 	# read data from csv
-	employees = read_csv(filename, person_name, company_name)
+	employees = dict_read_csv(filename)
 	
 	# get website for companies
-	results = []
-	for employee in employees:
-		try:
-			employee['website'] = get_website(employee['company'])
-		except:
-			# save work done so far and exit
-			write_to_csv(output_filename, output_fields, results)
-			print "%s occurred processing %s." % (sys.exc_info()[0].__name__, employee['name'])
-			sys.exit()
-		print employee['website']
-		results.append(employee)
-		#time.sleep(15)
+	augmented = get_websites(employees)	
 	
 	# write results to csv
-	write_to_csv(output_filename, output_fields, results)
+	headers = ['contact', 'company', 'website']
+	write_to_csv(output_filename, headers, augmented)
 	print "\nDone!"
