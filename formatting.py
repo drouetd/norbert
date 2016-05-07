@@ -24,6 +24,8 @@ def write_to_csv(filename, fields, records):
 
 
 def strip_extra_fields(final_headers, records):
+	
+	stripped_records = []
 	# identify the keys to remove
 	ban = [k for k in records[0].keys() if k not in final_headers]
 	for b in ban:

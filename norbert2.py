@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import sys
 import time
 import requests
@@ -102,44 +104,7 @@ def find_email(name, domain):
 					print "Aborting."
 					break
 				count += 2
-	elif status_code == 400:
-		print "Status code: %d. Skipping %s" % (status_code, name)
 	
-	elif status_code == 401:
-		print "Status code: %d for %s. Quitting..." % (status_code, name)
-		sys.exit()
-	
-	elif status_code == 402:
-		print "Status code: %d for %s. Quitting..." % (status_code, name)
-		sys.exit()
-	
-	return email
-
-
-if __name__ == "__main__":
-	
-	# initial query
-	id_no, email = norbert_post('IBRAHIM BEKLIYEN', 'icao.int')
-	if email:
-		print "email: ", email
-		sys.exit()
-	else:
-		print "ID: ", id_no
-
-	# poll until search completes
-	searching = True
-	count = 0
-	while searching and count < 30:
-		time.sleep(2)
-		searching, email, abort = norbert_get(id_no)
-		if abort:
-			print "Aborting."
-			break
-		if email:
-			print email
-		count += 2
-		print "Seconds waited: %d" % count
-	
-	print "\nDone!\n"
+	return email, status_code
 
 	

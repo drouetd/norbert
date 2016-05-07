@@ -67,7 +67,6 @@ def bing_api(query, source_type = "Web", top = 10, format = 'json'):
 
 
 
-
 if __name__ == "__main__":
 	
 	# parse input
