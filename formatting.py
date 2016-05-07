@@ -8,8 +8,8 @@ def dict_read_csv(filename):
 	with open(filename) as f:
 		f_csv = csv.DictReader(f, skipinitialspace=True)
 		for row in f_csv:
+			print row
 			records.append(row)
-			#print row
 	
 	return records
 
@@ -28,8 +28,11 @@ def strip_extra_fields(final_headers, records):
 	stripped_records = []
 	# identify the keys to remove
 	ban = [k for k in records[0].keys() if k not in final_headers]
-	for b in ban:
-		stripped_records = [x.pop(b) for x in records]
+	for rec in records:
+		for k in ban:
+			if k in rec:
+				del rec[k]
+		stripped_records.append(rec)
 	
 	return stripped_records
 
