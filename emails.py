@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from formatting import dict_read_csv
-from formatting import write_to_csv
-from formatting import strip_extra_fields
-from formatting import generate_output_filename
-from norbert2 import find_email
-	
+from utils import dict_read_csv
+from utils import write_to_csv
+from utils import strip_extra_fields
+from utils import generate_output_filename
+from norbert import norbert1
+from norbert import norbert2	
 
 def parse_args():
 	file_name = raw_input("Path to CSV file to process: ")
@@ -25,6 +25,11 @@ def save_to_file(filename, records):
 	return
 
 
+def find_email(name, domain, api_wrapper):
+	email, status = api_wrapper(name, domain)
+	return email, status
+
+
 if __name__ == "__main__":
 
 	# read a csv file with headers
@@ -33,7 +38,7 @@ if __name__ == "__main__":
 
 	# add the emails
 	for d in data:
-		d['email'], status = find_email(d['contact'], d['website'])
+		d['email'], status = find_email(d['contact'], d['website'], norbert1)
 		if status == 200:
 			print d['contact'], ": ", d['email']
 		
@@ -47,6 +52,11 @@ if __name__ == "__main__":
 			
 		elif status == 402:
 			print "Status code: %d for %s. Quitting..." % (status, d['contact'])
+			save_to_file(fname, data)
+			sys.exit()
+			
+		elif status == 410:
+			print "Status code: %d ( BUY MORE CREDITS!) for %s. Quitting..." % (status, d['contact'])
 			save_to_file(fname, data)
 			sys.exit()
 	

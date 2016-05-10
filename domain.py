@@ -5,31 +5,35 @@ import urllib
 import requests
 from requests.auth import HTTPBasicAuth
 from ConfigParser import SafeConfigParser
-from formatting import write_to_csv
-from formatting import generate_output_filename
-from formatting import dict_read_csv
+from utils import write_to_csv
+from utils import generate_output_filename
+from utils import dict_read_csv
 
 def parse_args():
 	file_name = raw_input("Path to CSV file to process: ")
 	return file_name
 
 
-def get_websites(records):
+def get_websites(records, fname, fields):
 	""" Iterate over list of contacts.Search Bing for company name \
 		and add first result's URL to contact's record. """
-	
 	augmented=[]
 	for record in records:
-		try:
-			# get company URL
-			result = bing_api(record['company'], top=1)
-			record['website'] = result['Url']
-		except:
-			# save work done so far and exit
-			write_to_csv(output_filename, output_fields, results)
-			print "%s occurred processing %s." % (sys.exc_info()[0].__name__, record['contact'])
-			sys.exit()
-		print record['website']
+		if record['company']:
+			try:
+				# get company URL
+				result = bing_api(record['company'], top=1)
+				if result['Url']:
+					record['website'] = result['Url']
+				else:
+					record['website'] = None
+				print record['website']
+			except:
+				# save work done so far and exit
+				print "%s occurred processing %s." % (sys.exc_info()[0].__name__, record['contact'])
+				#sys.exit()
+		else:
+			record['website'] = None
 		augmented.append(record)
 	
 	return augmented
@@ -72,14 +76,14 @@ if __name__ == "__main__":
 	# parse input
 	filename = parse_args()
 	output_filename = generate_output_filename(filename, "_web")
+	headers = ['contact', 'company', 'title', 'city', 'province', 'country', 'website']
 	
 	# read data from csv
 	employees = dict_read_csv(filename)
 	
 	# get website for companies
-	augmented = get_websites(employees)	
+	augmented = get_websites(employees, filename, headers)	
 	
 	# write results to csv
-	headers = ['contact', 'company', 'website']
 	write_to_csv(output_filename, headers, augmented)
 	print "\nDone!"

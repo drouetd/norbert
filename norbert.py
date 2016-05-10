@@ -1,168 +1,120 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import csv
+import time
 import requests
-from urlparse import urlparse
+from ConfigParser import SafeConfigParser
 
-def parse_args():
-	# parse args and error handling
-	if len(sys.argv) == 1:
-		print "Usage: python norbert.py -i"
-		sys.exit()
-	elif sys.argv[1] == '-i':
-		file_name = raw_input("Path to CSV file to process: ")
-		col_name = raw_input("Column number that contains the person's name: ")
-		col_website = raw_input("Column number that contains the company's website: ")
-		# and because people don't start counting at 0...
-		col_name = int(col_name) - 1 
-		if col_website != ('none' or 'None'):
-			col_website = int(col_website) - 1
-		else:
-			col_website = None
-	else:
-		print "Error processing arguments."
-		sys.exit()
-	return file_name, col_name, col_website
-
-
-def extract_domain(website):
-	domain = ''
-	# urlparse only recognizes netloc if '//' present.
-	if '//' not in website:
-		website = '//' + website
-	url = urlparse(website)
-	parts = url.netloc.split('.')
-	if len(parts) == 2:
-		domain = url.netloc
-	elif len(parts) > 2:
-		domain = '.'.join(parts[-2:])
-	else:
-		print "Problem parsing %s." % website
-		domain = None
-	return domain
-
-
-def read_csv(filename, name, website):
-	""" Converts CSV file to list of dictionaries. """
-	
-	lst = []
-	with open(filename, 'r') as f:
-		csvfile = csv.reader(f)
-		for row in csvfile:
-			person = {}
-			person['name'] = row[name]
-			person['website'] = row[website]
-			person['domain'] = extract_domain(row[website])
-			lst.append(person)
-	return lst
-
-
-def generate_output_filename(file_name, suffix):
-	""" Adds a suffix to the input csv to track progress through data pipeline. """
-	parts = file_name.split('.')
-	if len(parts) == 2:
-		output_filename = parts[0] + suffix + '.' + parts[1]
-	return output_filename
-
-
-def write_to_csv(filename, fields, records):
-	""" Writes a list of dictionaries to a csv file. """
-	
-	with open(filename, 'wb') as csvfile:
-		writer = csv.DictWriter(csvfile, fieldnames=fields, delimiter=',',quotechar='"',quoting=csv.QUOTE_ALL)
-		# writer.writeheader()
-		for rec in records:
-			try:
-				writer.writerow(rec)
-			except:
-				print "%s occurred with %s" % (sys.exc_info()[0].__name__, rec[fields[0]])
-				print rec
-				print'\n'
-	return 
-
-
-def post_norbert(payload, key):
+def norbert1(name, domain):
 	""" Posts to the voilanorbert.com api using the payload as parameters. """
+	
+	# get Voilanorbert API key
+	parser = SafeConfigParser()
+	parser.read('config.txt')
+	API_KEY = parser.get('norbert_v1', 'api_key')
 	
 	URL = "https://www.voilanorbert.com/api/v1/"
 	add_credits = False
-	payload['token'] = key
+	payload = {'token': API_KEY, 'name': name, 'domain': domain}
+	email = []
 	
 	# query the API
 	try:
 		r = requests.post(URL, data=payload)
 		if r.status_code == 200:
-			payload['success'] = r.json()['success']
-			payload['emails'] = r.json()['emails']
-			payload['error'] = None
-		elif r.status_code == 410:
-			payload['success'] = r.json()['success']
-			payload['emails'] = None
-			payload['error'] = r.json()['error']
-			add_credits = True
-		else:
-			payload['success'] = r.json()['success']
-			payload['emails'] = None
-			payload['error'] = r.json()['error']
+			email = r.json()['emails']
 	except:
 		print "%s occurred processing %s." % (sys.exc_info()[0].__name__, payload['name'])
-		payload['success'] = None
-		payload['emails'] = None
-		payload['error'] = sys.exc_info()[0].__name__
 	
-	# remove API key before returning
-	del payload['token']
-	
-	return payload, add_credits
+	return email, r.status_code
 
 
-
-if __name__ == '__main__':
+def norbert2_post(name, domain):
 	
-	original = []
-	augmented = []
+	# get Voilanorbert API key
+	parser = SafeConfigParser()
+	parser.read('config.txt')
+	API_TOKEN = parser.get('norbert_v2', 'api_token')
 	
-	# parse args and error handling
-	file_name, col_name, col_website = parse_args()
+	POST_URL = "https://api.voilanorbert.com/2016-01-04/search/name"
+	headers = {'api-token': API_TOKEN}
+	payload = {'name': name, 'domain': domain}
+	email = None
 	
-	# format the output file
-	output_filename = generate_output_filename(file_name, "_email")
-	fields = ['name', 'website', 'domain', 'success', 'emails', 'error']
-			
-	# fetch the api key
-	with open('Data/apikey.txt', 'r') as f:
-		key = f.read()
+	r = requests.post(POST_URL, headers=headers, data=payload)
 	
-	# load csv file with names to match
-	original = read_csv(file_name, col_name, col_website)
-	
-	# send names to the voilanorbert api one at a time
-	for person in original:
-		# TODO: if person['domain'] is None: don't send to Norbert.
-		print "Email lookup for %s..." % person['name']
-		result, buy_credits = post_norbert(person, key)
-		if buy_credits:
-			# save names processed so far and exit with nice message
-			print "Buy more credits!!!"
-			write_to_csv(output_filename, fields, augmented)
-			sys.exit()
-		else:
-			augmented.append(result)
-	
-	# write augmented list to a csv
-	write_to_csv(output_filename, fields, augmented)
-	
-	# terminate with stats msg
-	processed = len(original)
-	matched = len([person for person in original if person['success']==True])
-	print "\nNames processed: %d" % processed
-	print "Names matched to emails: %d" % matched
-	if processed:
-		percent = (matched / float(processed))*100
-		print "Success rate: %.1f percent" % percent
+	if r.status_code == 200:
+		ident = r.json()['id']
+		if not r.json()['searching']:
+			if r.json()['email']:
+				# email found
+				email = r.json()['email']['email']
+			else:
+				# email not found
+				pass
 	else:
-		print "Success rate: n/a"
-	print "Done!"
+		# there was a problem"
+		ident = -1
 	
-	sys.exit()
+	return ident, email, r.status_code
+
+
+def norbert2_get(person_id):
+	
+	# get Voilanorbert API key
+	parser = SafeConfigParser()
+	parser.read('config.txt')
+	API_TOKEN = parser.get('norbert_v2', 'api_token')
+	
+	GET_URL = "https://api.voilanorbert.com/2016-01-04/contacts/"
+	headers = {'api-token': API_TOKEN}
+	payload = {'id': person_id }
+	email = None
+	abort = False # hack because the GET sometimes can't find the post'ed ID which raises a StopIteration exception.
+	
+	r = requests.get(GET_URL, headers=headers, params=payload)
+	records = r.json()['result']
+	
+	# is Norbert still searching for the email addr?
+	try:
+		record = (rec for rec in records if rec['id']==person_id).next()
+	except:
+		# give up on this one
+		abort = True
+		return False, email, abort
+	if not record['searching']:
+		# search finished
+		if record['email']:
+			# email found
+			email = record['email']['email']
+		else:
+			# email not found
+			pass
+	
+	return record['searching'], email, abort
+
+
+def norbert2(name, domain):
+	
+	email = None
+	
+	# initial query
+	id_no, email, status_code = norbert2_post(name, domain)
+	if status_code == 200:
+		# result of query
+		if email:
+			pass
+		else:
+			# poll until search completes
+			searching = True
+			count = 0
+			while searching and count < 30:
+				time.sleep(2)
+				searching, email, abort = norbert2_get(id_no)
+				if abort:
+					break
+				count += 2
+	
+	return email, status_code
+
+	
