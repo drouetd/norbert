@@ -3,6 +3,7 @@
 import sys
 import urllib
 import requests
+from urlparse import urlparse
 from requests.auth import HTTPBasicAuth
 from ConfigParser import SafeConfigParser
 from utils import write_to_csv
@@ -24,7 +25,8 @@ def get_websites(records, fname, fields):
 				# get company URL
 				result = bing_api(record['company'], top=1)
 				if result['Url']:
-					record['website'] = result['Url']
+					url = urlparse(result['Url'])
+					record['website'] = url.netloc
 				else:
 					record['website'] = None
 				print record['website']

@@ -38,11 +38,11 @@ def strip_extra_fields(final_headers, records):
 	return stripped_records
 
 
-def generate_output_filename(file_name, suffix):
+def generate_output_filename(file_name, suffix, file_type="csv"):
 	""" Adds a suffix to the input csv to track progress through data pipeline. """
 	parts = file_name.split('.')
 	if len(parts) == 2:
-		output_filename = parts[0] + suffix + '.' + parts[1]
+		output_filename = parts[0] + suffix + '.' + file_type
 	return output_filename
 
 
