@@ -16,13 +16,19 @@ def norbert1(name, domain):
 	URL = "https://www.voilanorbert.com/api/v1/"
 	add_credits = False
 	payload = {'token': API_KEY, 'name': name, 'domain': domain}
-	email = []
+	email = ''
 	
 	# query the API
 	try:
 		r = requests.post(URL, data=payload)
 		if r.status_code == 200:
-			email = r.json()['emails']
+			# extract email from list of emails
+			email_list = r.json()['emails']
+			for mail in email_list:
+				email += mail
+				email += ' ,'
+			email = email.rstrip(',')
+			#email = r.json()['emails']
 	except:
 		print "%s occurred processing %s." % (sys.exc_info()[0].__name__, payload['name'])
 	
