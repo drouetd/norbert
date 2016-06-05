@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 import urllib
 import requests
@@ -16,9 +17,13 @@ def parse_args():
 
 
 def get_websites(records, fname, fields):
-	""" Iterate over list of contacts.Search Bing for company name \
-		and add first result's URL to contact's record. """
+	""" 
+	Iterate over list of contacts.Search Bing for company name \
+	and add first result's URL to contact's record. """
+	
+	EXCLUDED = ('www.linkedin.com', 'www.facebook.com', 'www.wikipedia.org')
 	augmented=[]
+	
 	for record in records:
 		if record['company']:
 			try:
@@ -26,7 +31,10 @@ def get_websites(records, fname, fields):
 				result = bing_api(record['company'], top=1)
 				if result['Url']:
 					url = urlparse(result['Url'])
-					record['website'] = url.netloc
+					if url.netloc not in EXCLUDED:
+						record['website'] = url.netloc
+					else:
+						record['website'] = None
 				else:
 					record['website'] = None
 				print record['website']
@@ -70,6 +78,28 @@ def bing_api(query, source_type = "Web", top = 10, format = 'json'):
 	json_result = response_data.json()
 	
 	return json_result['d']['results'][0]
+
+
+def main(filename):
+	# parse input
+	#filename = parse_args()
+	output_filename = generate_output_filename(filename, "_web")
+	headers = ['contact', 'company', 'title', 'city', 'province', 'country', 'website']
+	
+	# read data from csv
+	employees = dict_read_csv(filename)
+	
+	# get website for companies
+	augmented = get_websites(employees, filename, headers)	
+	
+	# write results to csv
+	write_to_csv(output_filename, headers, augmented)
+	
+	# remove input file if op was succesful
+	if os.path.exists(output_filename):
+		os.remove(filename)
+	
+	return
 
 
 
